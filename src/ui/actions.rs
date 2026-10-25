@@ -95,7 +95,7 @@ impl ActionListState {
             .show(ui, |ui| {
                 ui.add(
                     egui::TextEdit::singleline(&mut self.query)
-                        .hint_text("Search action ID, fallback name, combo, device, or context…")
+                        .hint_text("Search action ID, English action name, combo, device, or context…")
                         .desired_width(ui.available_width()),
                 );
                 ui.horizontal_wrapped(|ui| {
@@ -157,7 +157,7 @@ impl ActionListState {
                     ui.selectable_value(&mut self.descending, false, "Ascending");
                     ui.selectable_value(&mut self.descending, true, "Descending");
                 });
-                ui.small("Fallback names are not official translations. Each source entry is retained separately, including repeated action IDs and exact duplicates. Unknown context is never inferred from an ID.");
+                ui.small("English action names use official game labels where known; unknown IDs use human-readable fallbacks. Each source entry is retained separately, including repeated action IDs and exact duplicates. Unknown context is never inferred from an ID.");
                 let indices = self.filtered_indices(profile, analysis, layout);
                 ui.label(format!("{} of {} entries", indices.len(), profile.bindings.len()));
                 ui.separator();
@@ -317,6 +317,31 @@ mod tests {
                 .filtered_indices(&profile, &analysis, Layout::Qwerty)
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn search_covers_english_name_and_original_id_case_insensitively() {
+        let profile = analyzer::import(
+            "controls { hotkeys { ID_AAM { keyboardKey:i=16 } ID_TEST { mouseButton:i=0 } } }",
+        )
+        .unwrap();
+        let analysis = analyzer::analyze(&profile);
+        for query in [
+            "Fire air-to-air missile",
+            "fIrE AiR-tO-aIr MiSsIlE",
+            "ID_AAM",
+            "id_aam",
+        ] {
+            let state = ActionListState {
+                query: query.into(),
+                ..Default::default()
+            };
+            assert_eq!(
+                state.filtered_indices(&profile, &analysis, Layout::Qwerty),
+                vec![0],
+                "{query}"
+            );
+        }
     }
 
     #[test]

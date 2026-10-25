@@ -116,13 +116,18 @@ pub fn binding_card(
         egui::Frame::group(ui.style()).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new(&binding.action).strong().color(ACCENT));
+                ui.label(RichText::new(binding.display_name()).strong().color(ACCENT))
+                    .on_hover_text(if binding.english_name().is_some() {
+                        "Official English action name from the game."
+                    } else {
+                        "Unknown action ID: human-readable fallback, not an official game translation."
+                    });
                 ui.small(format!("entry #{} · {}", index + 1, binding.section.name()));
                 if action_link && ui.small_button("Show action in list").clicked() {
                     open_action = true;
                 }
             });
-            ui.label(binding.display_name()).on_hover_text("Human-readable fallback, not an official game translation.");
+            ui.label(RichText::new(&binding.action).monospace().small().color(MUTED));
             ui.label(RichText::new(binding.combination(layout)).strong());
             ui.horizontal_wrapped(|ui| {
                 ui.label(format!("Context: {}", binding.context.as_deref().unwrap_or("Unknown (not declared)")));
@@ -144,8 +149,9 @@ pub fn binding_card(
                         for issue in matching {
                             if let Some(other) = profile.bindings.get(issue.other) {
                                 ui.label(format!(
-                                    "#{} · {} · {} · Context: {}",
+                                    "#{} · {} ({}) · {} · Context: {}",
                                     issue.other + 1,
+                                    other.display_name(),
                                     other.action,
                                     other.combination(layout),
                                     other.context.as_deref().unwrap_or("Unknown (not declared)"),

@@ -45,6 +45,54 @@ fn real_export_snapshot_preserves_every_explicit_entry() {
 }
 
 #[test]
+fn english_names_cover_known_export_entries_without_guessing_missing_labels() {
+    let profile = import(EXPORT).unwrap();
+    assert_eq!(
+        profile
+            .bindings
+            .iter()
+            .filter(|b| b.english_name().is_some())
+            .count(),
+        81
+    );
+    assert!(
+        profile
+            .bindings
+            .iter()
+            .filter(|b| b.section == Section::Axes)
+            .all(|b| b.english_name().is_some())
+    );
+    let missing: std::collections::BTreeSet<_> = profile
+        .bindings
+        .iter()
+        .filter(|b| b.english_name().is_none())
+        .map(|b| b.action.as_str())
+        .collect();
+    assert_eq!(
+        missing.into_iter().collect::<Vec<_>>(),
+        [
+            "human_uav_climb_rangeMax",
+            "human_uav_climb_rangeMin",
+            "human_uav_pitch_rangeMax",
+            "human_uav_pitch_rangeMin",
+            "human_uav_roll_rangeMax",
+            "human_uav_roll_rangeMin",
+            "human_uav_throttle_rangeMax",
+            "human_uav_throttle_rangeMin",
+            "human_uav_yaw_rangeMax",
+            "human_uav_yaw_rangeMin",
+        ]
+    );
+    let shots: Vec<_> = profile
+        .bindings
+        .iter()
+        .filter(|b| b.action == "ID_SCREENSHOT")
+        .collect();
+    assert_eq!(shots.len(), 3);
+    assert!(shots.iter().all(|b| b.display_name() == "Screenshot"));
+}
+
+#[test]
 fn screenshot_duplicates_and_modifier_combo_are_not_overwritten() {
     let p = import(EXPORT).unwrap();
     let a = analyze(&p);
@@ -136,6 +184,9 @@ fn importing_never_changes_the_original_fixture() {
     let before = std::fs::read(path).unwrap();
     let profile = import(std::str::from_utf8(&before).unwrap()).unwrap();
     let _analysis = analyze(&profile);
+    for binding in &profile.bindings {
+        let _name = binding.display_name();
+    }
     assert_eq!(std::fs::read(path).unwrap(), before);
 }
 
