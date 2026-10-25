@@ -9,6 +9,7 @@ A local, read-only desktop explorer for War Thunder **text `.blk` controls expor
 - Interactive full-size ISO keyboard with an L-shaped Enter, centered arrow cluster, and double-height numpad keys: green for one explicit entry, orange for multiple entries, gray for none, and blue for the selected key.
 - US QWERTY and traditional French AZERTY legends on the same physical scan-code positions, including distinct left/right modifiers, navigation, and numpad keys.
 - Click a key to inspect all associated actions and **complete combinations**. Unknown and nonvisual keyboard codes remain selectable.
+- English game action names from a bundled, versioned localization catalogue; original identifiers stay visible and unknown commands keep an explicit fallback.
 - Action list with text search, device/section/analysis/empty-entry filters, and ascending/descending action or combination sorting.
 - Multiple entries for the same action are retained, including empty overrides and exact duplicates.
 - Keyboard, mouse buttons, joystick/gamepad buttons, and known axis fields; unfamiliar fields remain inspectable in raw metadata.
@@ -89,7 +90,7 @@ Nix is not required. The Windows native file dialog is supplied by `rfd`. Build 
 2. Choose **Import .blk file…**, or provide its path as the first command-line argument.
 3. Select **QWERTY** or **AZERTY** for the legends you want to read. This never changes the imported codes or interprets the current OS keyboard layout.
 4. In **Interactive Keyboard**, click a key to view every containing combination, source entry, and analysis note. Scroll horizontally on smaller windows.
-5. In **Action List**, search action identifiers, fallback names, combinations, devices, or contexts. Filter and sort without collapsing repeated entries.
+5. In **Action List**, search English action names, original identifiers, fallback names, combinations, devices, or contexts. Filter and sort without collapsing repeated entries.
 6. Expand **Import notes & source metadata** for unresolved preset paths, device mappings, unknown fields, and the ordered document tree.
 
 **Open example** explicitly loads the bundled real export at `tests/fixtures/inputs_wt.blk`. It is labeled as an example, not as your imported configuration. Nothing is loaded automatically unless a path is supplied.
@@ -107,7 +108,8 @@ src/
 ├── bindings/
 │   ├── model.rs          Explicit bindings, input types, profile, analysis notes
 │   ├── keymap.rs         Physical scan codes, layout legends, keyboard geometry
-│   └── analyzer.rs       Import/extraction, key index, conservative overlap analysis
+│   ├── analyzer.rs       Import/extraction, key index, conservative overlap analysis
+│   └── localization/     Pinned English game labels and exact section-aware lookup
 ├── main.rs               Native startup and logging
 ├── app.rs                Application state and background file import
 └── ui/
@@ -156,6 +158,14 @@ Known scalar types are validated (`i`, `i64`, finite `r`, and `b`). Includes are
 
 These are **not** Windows virtual-key numbers, USB HID usages, or character codes. For example, code 16 is Q on US QWERTY and A on French AZERTY. Unknown signed codes are preserved without truncation or remapping.
 
+### English action names
+
+Action cards in both views display English game labels while retaining the original `.blk` identifiers. Search accepts either. A bundled catalogue contains 1,659 nonempty localization entries from the game's `controls.csv` and `inf.csv`, pinned to a specific community datamine revision. Hotkeys and axes use their respective localization namespaces, not guessed aliases.
+
+Unknown identifiers retain an identifier-based fallback, marked in the tooltip. In the real bundled export, 81 of 97 entries have game labels, including every axis; 16 drone range-key entries have no exact translation in the source catalogues. The snapshot does not resolve presets or add commands/bindings absent from an export.
+
+The app and build remain entirely offline, with no new Rust dependencies. See [catalogue provenance, attribution, and regeneration instructions](src/bindings/localization/README.md). Python is only needed to regenerate the catalogue, not to use or build the viewer.
+
 ### Binding and conflict semantics
 
 - Each action block under `controls/hotkeys` or `controls/axes` is retained as a separate entry. Repeated input properties within one entry form one combination; repeated action blocks are alternatives.
@@ -182,8 +192,8 @@ Linux native startup has also been smoke-tested with Xvfb/Mesa and the real file
 
 ## Known limitations
 
-- Base presets, includes, game defaults, localization assets, activation semantics, and the game's final merge/context rules are not resolved. There are no guaranteed “free key” or definitive conflict claims.
-- Human-readable action names are identifier-based fallbacks, not official translations. Mouse/controller indices and axis properties are displayed rather than visualized or fully decoded.
+- Base presets, includes, game defaults, live game localization assets, activation semantics, and the game's final merge/context rules are not resolved. There are no guaranteed “free key” or definitive conflict claims.
+- English action names use a versioned game-localization snapshot, not a live or exhaustive catalogue. Missing translations use identifier-based fallbacks; no other display language is implemented. Mouse/controller indices and axis properties are displayed rather than visualized or fully decoded.
 - Input is UTF-8 **text BLK**, not binary/compressed BLK or VROMF. Bracketed arrays/matrices, triple-quoted strings, and hexadecimal integer literals are not supported. Unknown property types and ordinary vector scalar text are preserved, but not semantically validated.
 - Resource safeguards: desktop imports are at most **16 MiB**, parser nesting is at most **128**, derived context/source paths share a **64 MiB allocation budget**, and overlap analysis checks at most **100,000 pairs**. Exceeding the pair limit leaves key usage complete but shows a prominent incomplete-analysis warning. Exceeding other limits rejects the import without replacing the current profile.
 - QWERTY and AZERTY are display legends on the same 105-key ISO geometry, not comprehensive national/OS input-method support.
@@ -191,4 +201,4 @@ Linux native startup has also been smoke-tested with Xvfb/Mesa and the real file
 
 ## License
 
-MIT; see [LICENSE](LICENSE). The bundled export is a user-provided regression fixture. War Thunder and related marks belong to their respective owners.
+Project code is MIT; see [LICENSE](LICENSE). The bundled export is a user-provided regression fixture. Bundled game localization strings originate from Gaijin Entertainment and are not relicensed under MIT; see [source attribution](src/bindings/localization/README.md). War Thunder and related marks belong to their respective owners.

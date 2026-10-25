@@ -74,13 +74,20 @@ impl Binding {
             .join(" + ")
     }
 
-    /// A display fallback, not an official translation or semantic categorization.
+    /// Exact English game label from the bundled catalogue, when available.
+    pub fn english_name(&self) -> Option<&'static str> {
+        super::localization::english_name(&self.action, self.section)
+    }
+
+    /// English game label, or an identifier-based fallback for unknown commands.
     pub fn display_name(&self) -> String {
-        self.action
-            .strip_prefix("ID_")
-            .unwrap_or(&self.action)
-            .replace('_', " ")
-            .to_lowercase()
+        self.english_name().map(str::to_owned).unwrap_or_else(|| {
+            self.action
+                .strip_prefix("ID_")
+                .unwrap_or(&self.action)
+                .replace('_', " ")
+                .to_lowercase()
+        })
     }
 }
 
