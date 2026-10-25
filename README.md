@@ -6,7 +6,7 @@ A local, read-only desktop explorer for War Thunder **text `.blk` controls expor
 
 ## Features
 
-- Interactive full-size keyboard: green for one explicit entry, orange for multiple entries, gray for none, and blue for the selected key.
+- Interactive full-size ISO keyboard with an L-shaped Enter, centered arrow cluster, and double-height numpad keys: green for one explicit entry, orange for multiple entries, gray for none, and blue for the selected key.
 - US QWERTY and traditional French AZERTY legends on the same physical scan-code positions, including distinct left/right modifiers, navigation, and numpad keys.
 - Click a key to inspect all associated actions and **complete combinations**. Unknown and nonvisual keyboard codes remain selectable.
 - Action list with text search, device/section/analysis/empty-entry filters, and ascending/descending action or combination sorting.
@@ -35,24 +35,51 @@ The Linux file dialog uses the XDG desktop portal: run a session D-Bus service a
 
 ### Other Linux distributions
 
-Install a recent **stable Rust** toolchain with Cargo and a native C toolchain. On Debian/Ubuntu, the development libraries can be installed with:
+Install the following build and graphics dependencies. These are **Arch Linux package names**; use your distribution's equivalents:
+
+- `rust` — stable Rust including Cargo; alternatively, install stable Rust with [rustup](https://rustup.rs/).
+- `base-devel` — C compiler and linker.
+- `pkgconf` — provides `pkg-config`.
+- `libglvnd` — OpenGL.
+- `libx11`
+- `libxcursor`
+- `libxi`
+- `libxrandr`
+- `libxkbcommon`
+- `wayland`
+
+For the file picker, also install and configure:
+
+- `dbus`, with a running session bus.
+- `xdg-desktop-portal`.
+- A suitable portal backend, such as `xdg-desktop-portal-gtk` or `xdg-desktop-portal-kde`.
+
+A working X11 or Wayland session and an OpenGL-capable driver are required to display the GUI (for example, `mesa` for supported Intel/AMD GPUs). If the portal is unavailable, pass the file path on the command line instead:
 
 ```sh
-sudo apt install build-essential pkg-config libgl1-mesa-dev libx11-dev \
-  libxcursor-dev libxi-dev libxrandr-dev libxkbcommon-dev libwayland-dev
 cargo run --locked
+# Or open an exported .blk controls file immediately, without using the file picker:
+# Replace /path/to/inputs_wt.blk with the actual path to your controls file exported from War Thunder.
+cargo run --locked -- /path/to/inputs_wt.blk
 ```
-
-A working X11 or Wayland session and its graphics runtime are needed to display the GUI. The XDG portal requirements above also apply.
 
 ### Windows
 
-Install stable Rust using [rustup](https://rustup.rs/) and Visual Studio Build Tools with **Desktop development with C++** and the Windows SDK. From PowerShell:
+For Intel/AMD x64 systems, install [rustup](https://rustup.rs/) and use the stable `x86_64-pc-windows-msvc` Rust toolchain. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the **Desktop development with C++** workload and ensure these individual components are selected:
+
+- **MSVC C++ x64/x86 build tools** (named **MSVC v143 - VS 2022 C++ x64/x86 build tools** in Visual Studio 2022).
+- **Windows 11 SDK**, for example version **10.0.26100.0**. This SDK also supports targeting Windows 10; its name does not mean Windows 11 is required to run the application.
+
+The full Visual Studio IDE is not required. An existing Visual Studio or Build Tools installation with these components is sufficient. From PowerShell:
 
 ```powershell
+rustup default stable-x86_64-pc-windows-msvc
 cargo run --locked
-cargo run --release --locked -- "C:\Users\Player\Desktop\inputs_wt.blk"
+# Or open an exported .blk controls file immediately:
+cargo run --locked -- "C:\path\to\inputs_wt.blk"
 ```
+
+Replace `C:\path\to\inputs_wt.blk` with the actual path to your `.blk` controls file exported from War Thunder.
 
 Nix is not required. The Windows native file dialog is supplied by `rfd`. Build a distributable executable with `cargo build --release --locked`; it is placed at `target/release/wt-keybind-viewer.exe` on Windows or `target/release/wt-keybind-viewer` on Linux.
 
@@ -159,7 +186,7 @@ Linux native startup has also been smoke-tested with Xvfb/Mesa and the real file
 - Human-readable action names are identifier-based fallbacks, not official translations. Mouse/controller indices and axis properties are displayed rather than visualized or fully decoded.
 - Input is UTF-8 **text BLK**, not binary/compressed BLK or VROMF. Bracketed arrays/matrices, triple-quoted strings, and hexadecimal integer literals are not supported. Unknown property types and ordinary vector scalar text are preserved, but not semantically validated.
 - Resource safeguards: desktop imports are at most **16 MiB**, parser nesting is at most **128**, derived context/source paths share a **64 MiB allocation budget**, and overlap analysis checks at most **100,000 pairs**. Exceeding the pair limit leaves key usage complete but shows a prominent incomplete-analysis warning. Exceeding other limits rejects the import without replacing the current profile.
-- Keyboard geometry is a flattened ISO-style layout: tall Enter/numpad keys are not drawn as multi-row shapes. QWERTY and AZERTY are display presets, not comprehensive national/OS input-method support.
+- QWERTY and AZERTY are display legends on the same 105-key ISO geometry, not comprehensive national/OS input-method support.
 - No editing, exporting, profile management, browser UI, or comparisons are implemented.
 
 ## License
