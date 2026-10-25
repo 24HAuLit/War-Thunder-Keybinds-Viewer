@@ -48,21 +48,28 @@ pub fn profile_metadata(ui: &mut egui::Ui, profile: &Profile) {
                 for warning in &profile.warnings {
                     ui.colored_label(WARNING, warning);
                 }
-                ui.strong("Unresolved base preset paths");
+                ui.strong("Base preset paths declared in the export");
                 if profile.preset_paths.is_empty() {
                     ui.small("None declared in this export. Game defaults are still not inferred.");
                 }
                 for path in &profile.preset_paths {
                     ui.monospace(path);
                 }
-                ui.strong("Unresolved includes");
+                ui.strong("Applied embedded presets (base first)");
+                                if profile.resolved_presets.is_empty() {
+                                    ui.small("None applied. See warnings for unsupported references.");
+                                }
+                                for path in &profile.resolved_presets {
+                                    ui.monospace(path);
+                                }
+                                ui.strong("Unresolved includes");
                 if profile.includes.is_empty() {
                     ui.small("None declared.");
                 }
                 for path in &profile.includes {
                     ui.monospace(path);
                 }
-                ui.small("Referenced paths are informational only; the viewer does not open them.");
+                ui.small("Only exact supported preset paths use embedded data. No referenced path is opened on disk or fetched from the network.");
                 ui.strong("Raw document / device metadata");
                 ui.small("Expand source blocks to inspect device names, IDs, settings, and all other fields. Original entry order and repeated properties are retained; whitespace and comments are not.");
                 document_block(ui, &profile.document);
@@ -129,6 +136,7 @@ pub fn binding_card(
             });
             ui.label(RichText::new(&binding.action).monospace().small().color(MUTED));
             ui.label(RichText::new(binding.combination(layout)).strong());
+                        ui.small(binding_origin(binding));
             ui.horizontal_wrapped(|ui| {
                 ui.label(format!("Context: {}", binding.context.as_deref().unwrap_or("Unknown (not declared)")));
                 ui.label(format!("Devices: {}", devices(binding)));
@@ -161,10 +169,13 @@ pub fn binding_card(
                     });
                 }
             }
-            egui::CollapsingHeader::new("Raw entry properties & source")
+            egui::CollapsingHeader::new("Entry properties & source")
                 .show(ui, |ui| {
                     ui.label(format!("Source: {}", binding.source_path));
-                    ui.small("Properties below preserve order, repeats, raw values, and activation/settings fields. Quotes delimit the displayed raw string value.");
+                    ui.small("Properties retain raw values and activation/settings fields. Resolved axes also include retained preset properties; the original export is unchanged in source metadata. Quotes delimit displayed values.");
+                                        for inherited in &binding.inherited_properties {
+                                            ui.small(format!("Inherited {} from {}", inherited.property.name, inherited.preset_source));
+                                        }
                                         if binding.has_nested_data {
                                             ui.small("This entry also contains nested blocks. Inspect them under Import notes & source metadata; exact-duplicate classification is disabled for this entry.");
                                         }
@@ -178,6 +189,21 @@ pub fn binding_card(
         });
     });
     open_action
+}
+
+fn binding_origin(binding: &wt_keybind_viewer::bindings::model::Binding) -> String {
+    let source = match &binding.preset_source {
+        Some(path) => format!("Inherited preset: {path}"),
+        None => "Source: export".into(),
+    };
+    if binding.inherited_properties.is_empty() {
+        source
+    } else {
+        format!(
+            "{source} · {} retained preset properties (mixed origins)",
+            binding.inherited_properties.len()
+        )
+    }
 }
 
 pub fn devices(binding: &wt_keybind_viewer::bindings::model::Binding) -> String {
@@ -196,6 +222,24 @@ mod tests {
     use wt_keybind_viewer::bindings::analyzer;
 
     #[test]
+    fn provenance_distinguishes_export_inheritance_and_mixed_axes() {
+        let profile = analyzer::import(include_str!("../../tests/fixtures/inputs_wt.blk")).unwrap();
+        let find = |action: &str| {
+            profile
+                .bindings
+                .iter()
+                .find(|b| b.action == action)
+                .unwrap()
+        };
+        assert!(
+            binding_origin(find("ID_CAMERA_DEFAULT"))
+                .contains("Inherited preset: config/hotkeys/hotkey.keyboard_ver1.blk")
+        );
+        assert_eq!(binding_origin(find("ID_AAM")), "Source: export");
+        assert!(binding_origin(find("gm_zoom")).contains("mixed origins"));
+    }
+
+    #[test]
     fn both_views_render_at_narrow_and_wide_sizes() {
         let profile = analyzer::import(include_str!("../../tests/fixtures/inputs_wt.blk")).unwrap();
         let analysis = analyzer::analyze(&profile);
@@ -203,27 +247,35 @@ mod tests {
         configure(&ctx);
         for width in [480.0, 1280.0] {
             for layout in [Layout::Qwerty, Layout::Azerty] {
-                for keyboard_view in [true, false] {
-                    let output = ctx.run(
-                        egui::RawInput {
-                            screen_rect: Some(egui::Rect::from_min_size(
-                                egui::Pos2::ZERO,
-                                egui::vec2(width, 700.0),
-                            )),
-                            ..Default::default()
-                        },
-                        |ctx| {
-                            egui::CentralPanel::default().show(ctx, |ui| {
-                                if keyboard_view {
-                                    keyboard::show(ui, &profile, &analysis, layout, &mut Some(57));
-                                } else {
-                                    actions::ActionListState::default()
-                                        .show(ui, &profile, &analysis, layout);
-                                }
-                            });
-                        },
-                    );
-                    assert!(!output.shapes.is_empty());
+                for selected_key in [57, 63, 64, 65] {
+                    for keyboard_view in [true, false] {
+                        let output = ctx.run(
+                            egui::RawInput {
+                                screen_rect: Some(egui::Rect::from_min_size(
+                                    egui::Pos2::ZERO,
+                                    egui::vec2(width, 700.0),
+                                )),
+                                ..Default::default()
+                            },
+                            |ctx| {
+                                egui::CentralPanel::default().show(ctx, |ui| {
+                                    if keyboard_view {
+                                        keyboard::show(
+                                            ui,
+                                            &profile,
+                                            &analysis,
+                                            layout,
+                                            &mut Some(selected_key),
+                                        );
+                                    } else {
+                                        actions::ActionListState::default()
+                                            .show(ui, &profile, &analysis, layout);
+                                    }
+                                });
+                            },
+                        );
+                        assert!(!output.shapes.is_empty());
+                    }
                 }
             }
         }

@@ -4,7 +4,8 @@ use thiserror::Error;
 
 use crate::blk::{self, Block, Property};
 
-use super::model::{Binding, BindingIssue, Input, IssueKind, Profile, Section};
+use super::model::{Binding, BindingIssue, InheritedProperty, Input, IssueKind, Profile, Section};
+use super::presets;
 
 #[derive(Debug, Error)]
 pub enum ImportError {
@@ -18,8 +19,17 @@ pub enum ImportError {
     StructureTooLarge,
 }
 
-/// Import only explicit entries; never read, resolve, or modify external files.
+/// Resolve exact embedded version-5 default presets, without filesystem/network I/O.
 pub fn import(source: &str) -> Result<Profile, ImportError> {
+    import_with_mode(source, true)
+}
+
+/// Import only explicit entries, preserving the original export/count behavior.
+pub fn import_explicit(source: &str) -> Result<Profile, ImportError> {
+    import_with_mode(source, false)
+}
+
+fn import_with_mode(source: &str, resolve: bool) -> Result<Profile, ImportError> {
     let document = blk::parse(source)?;
     let controls: Vec<_> = document.blocks().filter(|b| b.name == "controls").collect();
     if controls.is_empty() {
@@ -27,30 +37,53 @@ pub fn import(source: &str) -> Result<Profile, ImportError> {
     }
     let mut bindings = Vec::new();
     let mut preset_paths = Vec::new();
+    let mut resolved_presets = Vec::new();
+    let mut warnings = Vec::new();
     let mut path_budget = 64 * 1024 * 1024;
     for control in controls {
-        for block in control.blocks() {
-            match block.name.as_str() {
-                "basePresetPaths" => collect_values(block, &mut preset_paths),
-                "hotkeys" => collect_bindings(
-                    block,
-                    Section::Hotkeys,
-                    &[],
-                    &mut bindings,
-                    &mut path_budget,
-                )?,
-                "axes" => {
-                    collect_bindings(block, Section::Axes, &[], &mut bindings, &mut path_budget)?
-                }
-                _ => {}
+        for block in control.blocks().filter(|b| b.name == "basePresetPaths") {
+            collect_values(block, &mut preset_paths);
+        }
+        let layers = if resolve {
+            presets::resolve(control, &mut warnings)
+        } else {
+            Vec::new()
+        };
+        let mut effective = Vec::new();
+        for layer in &layers {
+            let mut entries = collect_control(layer.controls, &mut path_budget)?;
+            for binding in &mut entries {
+                charge(&mut path_budget, layer.path.len())?;
+                binding.preset_source = Some(layer.path.clone());
+            }
+            merge_layer(&mut effective, entries, &mut path_budget)?;
+            if !resolved_presets.contains(&layer.path) {
+                resolved_presets.push(layer.path.clone());
             }
         }
+        let explicit = collect_control(control, &mut path_budget)?;
+        if layers.is_empty() {
+            // In particular, no-base files do not acquire an implicit empty preset
+            // and repeated explicit entries are never normalized away.
+            effective = explicit;
+        } else {
+            merge_layer(&mut effective, explicit, &mut path_budget)?;
+        }
+        bindings.extend(effective);
     }
     let mut includes = Vec::new();
     collect_includes(&document, &mut includes);
-    let mut warnings = Vec::new();
-    if !preset_paths.is_empty() || !includes.is_empty() {
+    if !resolve && (!preset_paths.is_empty() || !includes.is_empty()) {
         warnings.push("Preset/include references are not resolved. Only explicit entries are shown; keys without explicit bindings may still be used by inherited controls.".into());
+    }
+    if resolve && !includes.is_empty() {
+        warnings.push("Include references are recorded but never followed, even when their path names an embedded preset; included entries are not resolved.".into());
+    }
+    if resolve && !preset_paths.is_empty() {
+        warnings.push(format!("Offline preset simulation uses snapshot {}. Controls version 5 is not a game-version match guarantee; older/newer exports may differ. Compatibility aliases, implicit empty presets, game fallbacks (appliedFallbacksVer), default axis values, params and device remapping are not simulated. Unlisted keys are not proven free.", presets::SNAPSHOT));
+    }
+    if resolve && !resolved_presets.is_empty() {
+        warnings.push("Axis properties may have mixed origins: preset_source identifies the entry layer; inherited_properties records retained preset scalars (already included in properties/inputs). Repeated explicit entries remain visible; nested structures use source_path structural matching, not full game-script semantics. Reserved axis groups are retained as structural data, not simulated game axes.".into());
     }
     if bindings.is_empty() {
         warnings.push("No explicit hotkey or axis entries found in the controls block.".into());
@@ -60,9 +93,134 @@ pub fn import(source: &str) -> Result<Profile, ImportError> {
         document,
         bindings,
         preset_paths,
+        resolved_presets,
         includes,
         warnings,
     })
+}
+
+fn collect_control(control: &Block, budget: &mut usize) -> Result<Vec<Binding>, ImportError> {
+    let mut entries = Vec::new();
+    for block in control.blocks() {
+        let section = match block.name.as_str() {
+            "hotkeys" => Section::Hotkeys,
+            "axes" => Section::Axes,
+            _ => continue,
+        };
+        collect_bindings(block, section, &[], &mut entries, budget)?;
+    }
+    Ok(entries)
+}
+
+fn charge(budget: &mut usize, bytes: usize) -> Result<(), ImportError> {
+    *budget = budget
+        .checked_sub(bytes)
+        .ok_or(ImportError::StructureTooLarge)?;
+    Ok(())
+}
+
+// controlspreset.nut at the pinned snapshot: applyBasePreset accepts only
+// default; loadHotkeysFromBlk resets once per action per layer, then appends
+// every block (including empty siblings). loadAxesFromBlk copies scalar params
+// into the existing axis table; an empty axis is therefore not a reset.
+fn merge_layer(
+    inherited: &mut Vec<Binding>,
+    layer: Vec<Binding>,
+    budget: &mut usize,
+) -> Result<(), ImportError> {
+    // Borrow keys rather than duplicating potentially very long structural paths.
+    let replaced: BTreeSet<_> = layer.iter().map(|b| b.source_path.as_str()).collect();
+    let mut axis_indices = BTreeMap::new();
+    for (index, binding) in inherited.iter().enumerate() {
+        if binding.section == Section::Axes && replaced.contains(binding.source_path.as_str()) {
+            charge(budget, binding.source_path.len())?;
+            axis_indices.insert(binding.source_path.clone(), index);
+        }
+    }
+    let old_len = inherited.len();
+    // Preserve layer order and repeated explicit entries, not just the last value.
+    for binding in &layer {
+        charge(budget, binding.source_path.len())?;
+    }
+    let replaced: BTreeSet<_> = replaced.into_iter().map(str::to_owned).collect();
+    for mut binding in layer {
+        if binding.section == Section::Axes && !reserved_axis(&binding) {
+            if let Some(&index) = axis_indices.get(&binding.source_path) {
+                overlay_axis(&inherited[index], &mut binding, budget)?;
+            }
+            // The next same-layer axis block sees this block's cumulative table.
+            if !axis_indices.contains_key(&binding.source_path) {
+                charge(budget, binding.source_path.len())?;
+            }
+            axis_indices.insert(binding.source_path.clone(), inherited.len());
+        }
+        inherited.push(binding);
+    }
+    let mut index = 0;
+    inherited.retain(|binding| {
+        let keep = index >= old_len || !replaced.contains(&binding.source_path);
+        index += 1;
+        keep
+    });
+    Ok(())
+}
+
+fn reserved_axis(binding: &Binding) -> bool {
+    let name = binding
+        .context
+        .as_deref()
+        .unwrap_or(&binding.action)
+        .split(" / ")
+        .next()
+        .unwrap_or("");
+    name.starts_with("square") || matches!(name, "mouse" | "devices" | "hangar")
+}
+
+fn overlay_axis(
+    previous: &Binding,
+    current: &mut Binding,
+    budget: &mut usize,
+) -> Result<(), ImportError> {
+    let replaced: BTreeSet<_> = current.properties.iter().map(|p| p.name.as_str()).collect();
+    let mut retained = Vec::new();
+    for property in &previous.properties {
+        if replaced.contains(property.name.as_str()) {
+            continue;
+        }
+        let origin = previous
+            .inherited_properties
+            .iter()
+            .find(|p| p.property == *property)
+            .map(|p| &p.preset_source)
+            .or(previous.preset_source.as_ref());
+        let bytes = property
+            .name
+            .len()
+            .saturating_add(property.kind.len())
+            .saturating_add(property.value.len());
+        charge(
+            budget,
+            bytes
+                .saturating_mul(3)
+                .saturating_add(origin.map_or(0, String::len)),
+        )?;
+        retained.push(property.clone());
+        if let Some(origin) = origin {
+            current.inherited_properties.push(InheritedProperty {
+                property: property.clone(),
+                preset_source: origin.clone(),
+            });
+        }
+    }
+    retained.append(&mut current.properties);
+    current.properties = retained;
+    current.inputs = current
+        .properties
+        .iter()
+        .filter_map(input_from_property)
+        .collect();
+    current.has_nested_data |= previous.has_nested_data;
+    Ok(())
 }
 
 fn collect_values(block: &Block, out: &mut Vec<String>) {
@@ -119,6 +277,8 @@ fn collect_bindings<'a>(
                 properties,
                 has_nested_data: has_children,
                 source_path: path.join(" / "),
+                preset_source: None,
+                inherited_properties: Vec::new(),
             });
         }
         if has_children {
@@ -249,6 +409,8 @@ pub fn analyze(profile: &Profile) -> Analysis {
                     && a.context == b.context
                     && !a.has_nested_data
                     && !b.has_nested_data
+                    && a.inherited_properties.is_empty()
+                    && b.inherited_properties.is_empty()
                     && a.properties == b.properties
                 {
                     IssueKind::Duplicate
@@ -382,6 +544,50 @@ mod tests {
                 &mut bindings,
                 &mut budget
             ),
+            Err(ImportError::StructureTooLarge)
+        ));
+    }
+
+    #[test]
+    fn merging_matches_full_structural_paths_and_retains_sibling_order() {
+        let mut inherited =
+            profile("air {A{keyboardKey:i=7} A{keyboardKey:i=8}} tank {A{keyboardKey:i=9}}")
+                .bindings;
+        let layer = profile("air {A{} A{keyboardKey:i=10} A{}}").bindings;
+        merge_layer(&mut inherited, layer, &mut (64 * 1024 * 1024)).unwrap();
+        assert_eq!(inherited.len(), 4);
+        assert_eq!(inherited[0].context.as_deref(), Some("tank"));
+        assert_eq!(inherited[0].inputs, [Input::Keyboard(9)]);
+        assert!(inherited[1].inputs.is_empty());
+        assert_eq!(inherited[2].inputs, [Input::Keyboard(10)]);
+        assert!(inherited[3].inputs.is_empty());
+        assert!(
+            inherited[1..]
+                .iter()
+                .all(|b| b.source_path == "controls / hotkeys / air / A")
+        );
+    }
+
+    #[test]
+    fn inheritance_path_and_property_copies_share_the_derived_budget() {
+        let mut inherited =
+            import_explicit("controls {axes {zoom{mouseAxisId:i=3;relative:b=yes}}}")
+                .unwrap()
+                .bindings;
+        inherited[0].preset_source = Some("config/hotkeys/test-fixture.blk".into());
+        let layer = import_explicit("controls {axes {zoom{}}}")
+            .unwrap()
+            .bindings;
+        assert!(matches!(
+            merge_layer(&mut inherited, layer, &mut 1),
+            Err(ImportError::StructureTooLarge)
+        ));
+
+        let previous = &inherited[0];
+        let mut current = previous.clone();
+        current.properties.clear();
+        assert!(matches!(
+            overlay_axis(previous, &mut current, &mut 1),
             Err(ImportError::StructureTooLarge)
         ));
     }

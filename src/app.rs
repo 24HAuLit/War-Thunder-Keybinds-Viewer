@@ -125,10 +125,16 @@ impl ViewerApp {
             ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
                 let available = self.pending.is_none();
-                if ui.add_enabled(available, egui::Button::new("Import .blk file…")).clicked() {
+                if ui
+                    .add_enabled(available, egui::Button::new("Import .blk file…"))
+                    .clicked()
+                {
                     self.start_import(ImportSource::Dialog, ctx);
                 }
-                if ui.add_enabled(available, egui::Button::new("Open example")).clicked() {
+                if ui
+                    .add_enabled(available, egui::Button::new("Open example"))
+                    .clicked()
+                {
                     self.start_import(ImportSource::Example, ctx);
                 }
                 if !available {
@@ -144,13 +150,23 @@ impl ViewerApp {
             if let Some(loaded) = &self.loaded {
                 ui.add_space(5.0);
                 ui.horizontal_wrapped(|ui| {
-                    let prefix = if loaded.example { "Bundled example" } else { "Imported" };
-                    ui.strong(format!("{prefix}: {}", loaded.name)).on_hover_text(&loaded.origin);
+                    let prefix = if loaded.example {
+                        "Bundled example"
+                    } else {
+                        "Imported"
+                    };
+                    ui.strong(format!("{prefix}: {}", loaded.name))
+                        .on_hover_text(&loaded.origin);
                     ui.label(format!(
-                        "{} entries · {} explicit keyboard codes · {} empty / settings-only entries",
+                        "{} entries · {} keyboard codes · {} empty / settings-only entries",
                         loaded.profile.bindings.len(),
                         loaded.analysis.by_key.len(),
-                        loaded.profile.bindings.iter().filter(|b| b.inputs.is_empty()).count(),
+                        loaded
+                            .profile
+                            .bindings
+                            .iter()
+                            .filter(|b| b.inputs.is_empty())
+                            .count(),
                     ));
                 });
             }
@@ -187,21 +203,21 @@ impl eframe::App for ViewerApp {
             let Some(loaded) = &self.loaded else {
                 ui.add_space(40.0);
                 ui.heading("Explore your controls, one key at a time.");
-                ui.label("Import a War Thunder text .blk controls export to see its explicit bindings.");
+                ui.label("Import a War Thunder text .blk controls export to see its bindings and supported inherited presets.");
                 ui.add_space(12.0);
                 ui.label("Or choose Open example to inspect the bundled sample — no file is loaded automatically.");
                 ui.add_space(12.0);
-                ui.colored_label(ui::WARNING, "Base presets and includes are not resolved.");
-                ui.label("No explicit binding does not mean a key is free in game.");
+                ui.label("The keyboard_ver1 preset chain is bundled for offline use. Other presets and includes remain unresolved.");
+                ui.label("No displayed binding does not mean a key is free in game.");
                 ui.small("Local, read-only inspection. Imports are limited to 16 MiB of UTF-8 text.");
                 return;
             };
 
             ui.colored_label(
                 ui::WARNING,
-                "Explicit export entries only — no explicit binding ≠ free in game.",
+                "Export + supported offline presets — no displayed binding ≠ free in game.",
             );
-            ui.small("Base presets and includes are unresolved; inherited controls may be absent. Shared keys and potential overlaps are not proven conflicts.");
+            ui.small(format!("{} embedded presets applied. Snapshot versions may differ from your game; unknown presets and includes remain unresolved. Shared keys are not proven conflicts.", loaded.profile.resolved_presets.len()));
             if loaded.analysis.overlap_checks_truncated {
                             ui.colored_label(ui::WARNING, "Overlap analysis incomplete: reached the 100,000-pair safety limit. Key usage is complete, but additional duplicates/overlaps may exist.");
                         }

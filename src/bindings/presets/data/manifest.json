@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/gszabi99/War-Thunder-Datamine",
+  "commit": "aa326f10c6ba7d523647572368ead2e4d51ffb4d",
+  "commit_date": "2026-10-23T13:44:25Z",
+  "commit_version_label": "2.59.0.86",
+  "revision_resolution": {
+    "api_url": "https://api.github.com/repos/gszabi99/War-Thunder-Datamine/commits/master",
+    "resolved_on": "2026-10-25"
+  },
+  "license": {
+    "spdx_identifier": null,
+    "repository_api_license": null,
+    "pinned_license_api_status": 404,
+    "pinned_license_api_url": "https://api.github.com/repos/gszabi99/War-Thunder-Datamine/license?ref=aa326f10c6ba7d523647572368ead2e4d51ffb4d",
+    "notice": "Datamined War Thunder game data; rights remain with their respective owners (including Gaijin Entertainment). No affirmative redistribution license was identified. The viewer's license does not relicense this data."
+  },
+  "roots": [
+    "hotkey.keyboard_ver1.blk",
+    "hotkey.base.keyboard_simulator.blk",
+    "hotkey.base.keyboard.blk",
+    "hotkey.empty_ver1.blk"
+  ],
+  "files": [
+    {
+      "source_path": "aces.vromfs.bin_u/config/hotkeys/hotkey.base.keyboard.blkx",
+      "source_url": "https://raw.githubusercontent.com/gszabi99/War-Thunder-Datamine/aa326f10c6ba7d523647572368ead2e4d51ffb4d/aces.vromfs.bin_u/config/hotkeys/hotkey.base.keyboard.blkx",
+      "source_file": "source/hotkey.base.keyboard.blkx",
+      "source_sha256": "9174dbe9084d22a18cb21500f76d8037f8fd7850842ecf23ca9262506dc3aa1c",
+      "generated_file": "hotkey.base.keyboard.blk",
+      "generated_sha256": "8e4b63450381dfffcfc897fa09940d13d5f8ed043f84a848e419b5dbf29cc7c7",
+      "controls_version": 5,
+      "default_dependencies": [
+        "hotkey.empty_ver1.blk"
+      ]
+    },
+    {
+      "source_path": "aces.vromfs.bin_u/config/hotkeys/hotkey.base.keyboard_simulator.blkx",
+      "source_url": "https://raw.githubusercontent.com/gszabi99/War-Thunder-Datamine/aa326f10c6ba7d523647572368ead2e4d51ffb4d/aces.vromfs.bin_u/config/hotkeys/hotkey.base.keyboard_simulator.blkx",
+      "source_file": "source/hotkey.base.keyboard_simulator.blkx",
+      "source_sha256": "54edd562e6491b094c27f582cdfe8f4eaee2adc309eaea69e011c4873a19147b",
+      "generated_file": "hotkey.base.keyboard_simulator.blk",
+      "generated_sha256": "31cbcf2b26da256539477fedd2ff74d97bb6ac1965135788431f5cf4d032f8d2",
+      "controls_version": 5,
+      "default_dependencies": [
+        "hotkey.base.keyboard.blk"
+      ]
+    },
+    {
+      "source_path": "aces.vromfs.bin_u/config/hotkeys/hotkey.empty_ver1.blkx",
+      "source_url": "https://raw.githubusercontent.com/gszabi99/War-Thunder-Datamine/aa326f10c6ba7d523647572368ead2e4d51ffb4d/aces.vromfs.bin_u/config/hotkeys/hotkey.empty_ver1.blkx",
+      "source_file": "source/hotkey.empty_ver1.blkx",
+      "source_sha256": "a378796fef5873e9e48dd919534d0f1c43730ddd6a03afeee26bcb7e0dc2be1e",
+      "generated_file": "hotkey.empty_ver1.blk",
+      "generated_sha256": "066471f363e54b13bb32943ed0bfa12e9caa82b7989e8111ac78e0bb74b520e1",
+      "controls_version": 5,
+      "default_dependencies": [
+        "hotkey.event.human.blk"
+      ]
+    },
+    {
+      "source_path": "aces.vromfs.bin_u/config/hotkeys/hotkey.event.human.blkx",
+      "source_url": "https://raw.githubusercontent.com/gszabi99/War-Thunder-Datamine/aa326f10c6ba7d523647572368ead2e4d51ffb4d/aces.vromfs.bin_u/config/hotkeys/hotkey.event.human.blkx",
+      "source_file": "source/hotkey.event.human.blkx",
+      "source_sha256": "e3d7b37ef1684302fece926110da011b92b5d1bc916c80f864b1f6f8dd33b55b",
+      "generated_file": "hotkey.event.human.blk",
+      "generated_sha256": "ccef5aeaa57b55f27c0e647c68296331dd05d9f198891ac76c879437326d937d",
+      "controls_version": 5,
+      "default_dependencies": []
+    },
+    {
+      "source_path": "aces.vromfs.bin_u/config/hotkeys/hotkey.keyboard_ver1.blkx",
+      "source_url": "https://raw.githubusercontent.com/gszabi99/War-Thunder-Datamine/aa326f10c6ba7d523647572368ead2e4d51ffb4d/aces.vromfs.bin_u/config/hotkeys/hotkey.keyboard_ver1.blkx",
+      "source_file": "source/hotkey.keyboard_ver1.blkx",
+      "source_sha256": "f36e042a5bac84281149bdae3876635fc3a9fd7429db7aebda390a85eaf516e9",
+      "generated_file": "hotkey.keyboard_ver1.blk",
+      "generated_sha256": "10957b6a97dc1f4d2ce1c80f0c4a6047b2f27210684a1c5b8e64c778ab861d45",
+      "controls_version": 5,
+      "default_dependencies": [
+        "hotkey.base.keyboard_simulator.blk"
+      ]
+    }
+  ]
+}

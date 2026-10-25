@@ -2,16 +2,17 @@
 
 A local, read-only desktop explorer for War Thunder **text `.blk` controls exports**, built with Rust and egui/eframe. Linux and Windows are the desktop targets. Not affiliated with Gaijin Entertainment.
 
-> **No explicit binding does not mean a key is free in game.** Exported controls can inherit a base preset. This viewer does not load game assets, resolve presets/includes, or invent bindings that are absent from the export.
+> **No displayed binding does not mean a key is free in game.** The viewer resolves supported version-5 base presets from a pinned offline snapshot, then applies your export's overrides. Unknown presets, includes, and game fallbacks remain unresolved.
 
 ## Features
 
-- Interactive full-size ISO keyboard with an L-shaped Enter, centered arrow cluster, and double-height numpad keys: green for one explicit entry, orange for multiple entries, gray for none, and blue for the selected key.
+- Interactive full-size ISO keyboard with an L-shaped Enter, centered arrow cluster, and double-height numpad keys: green for one entry (export or inherited preset), orange for multiple entries, gray for none, and blue for the selected key.
 - US QWERTY and traditional French AZERTY legends on the same physical scan-code positions, including distinct left/right modifiers, navigation, and numpad keys.
 - Click a key to inspect all associated actions and **complete combinations**. Unknown and nonvisual keyboard codes remain selectable.
 - English game action names from a bundled, versioned localization catalogue; original identifiers stay visible and unknown commands keep an explicit fallback.
 - Action list with text search, device/section/analysis/empty-entry filters, and ascending/descending action or combination sorting.
-- Multiple entries for the same action are retained, including empty overrides and exact duplicates.
+- Offline recursive loading of `hotkey.keyboard_ver1.blk` and its four dependencies, with visible export/preset provenance and property-wise axis overrides.
+- Surviving alternatives for the same action are retained, including empty overrides and exact duplicates.
 - Keyboard, mouse buttons, joystick/gamepad buttons, and known axis fields; unfamiliar fields remain inspectable in raw metadata.
 - Exact duplicate detection and conservative full-combination overlap notes. Reusing a modifier or key in different combinations is not itself a conflict.
 - Clear parse errors with line/column locations. Failed or cancelled imports preserve the currently displayed profile.
@@ -90,8 +91,8 @@ Nix is not required. The Windows native file dialog is supplied by `rfd`. Build 
 2. Choose **Import .blk file…**, or provide its path as the first command-line argument.
 3. Select **QWERTY** or **AZERTY** for the legends you want to read. This never changes the imported codes or interprets the current OS keyboard layout.
 4. In **Interactive Keyboard**, click a key to view every containing combination, source entry, and analysis note. Scroll horizontally on smaller windows.
-5. In **Action List**, search English action names, original identifiers, fallback names, combinations, devices, or contexts. Filter and sort without collapsing repeated entries.
-6. Expand **Import notes & source metadata** for unresolved preset paths, device mappings, unknown fields, and the ordered document tree.
+5. In **Action List**, search English action names, original identifiers, fallback names, combinations, devices, contexts, or source presets. Filter and sort without collapsing repeated entries.
+6. Expand **Import notes & source metadata** for applied/unresolved preset paths, device mappings, unknown fields, and the ordered document tree.
 
 **Open example** explicitly loads the bundled real export at `tests/fixtures/inputs_wt.blk`. It is labeled as an example, not as your imported configuration. Nothing is loaded automatically unless a path is supplied.
 
@@ -106,7 +107,8 @@ src/
 │   ├── mod.rs            Ordered Block / Entry / Property model
 │   └── parser.rs         Text parser and located errors
 ├── bindings/
-│   ├── model.rs          Explicit bindings, input types, profile, analysis notes
+│   ├── model.rs          Resolved bindings, provenance, input types, analysis notes
+│   ├── presets/          Allowlisted recursive resolver and pinned offline data
 │   ├── keymap.rs         Physical scan codes, layout legends, keyboard geometry
 │   ├── analyzer.rs       Import/extraction, key index, conservative overlap analysis
 │   └── localization/     Pinned English game labels and exact section-aware lookup
@@ -162,17 +164,29 @@ These are **not** Windows virtual-key numbers, USB HID usages, or character code
 
 Action cards in both views display English game labels while retaining the original `.blk` identifiers. Search accepts either. A bundled catalogue contains 1,659 nonempty localization entries from the game's `controls.csv` and `inf.csv`, pinned to a specific community datamine revision. Hotkeys and axes use their respective localization namespaces, not guessed aliases.
 
-Unknown identifiers retain an identifier-based fallback, marked in the tooltip. In the real bundled export, 81 of 97 entries have game labels, including every axis; 16 drone range-key entries have no exact translation in the source catalogues. The snapshot does not resolve presets or add commands/bindings absent from an export.
+Unknown identifiers retain an identifier-based fallback, marked in the tooltip. In the real bundled export, 81 of 97 entries have game labels, including every axis; 16 drone range-key entries have no exact translation in the source catalogues. The localization catalogue itself does not add bindings; preset inheritance is handled separately below.
 
 The app and build remain entirely offline, with no new Rust dependencies. See [catalogue provenance, attribution, and regeneration instructions](src/bindings/localization/README.md). Python is only needed to regenerate the catalogue, not to use or build the viewer.
+
+### Offline preset inheritance
+
+The bundled snapshot comes from [gszabi99/War-Thunder-Datamine](https://github.com/gszabi99/War-Thunder-Datamine) at `aa326f10c6ba7d523647572368ead2e4d51ffb4d` (game label `2.59.0.86`). The complete chain is `keyboard_ver1` → `base.keyboard_simulator` → `base.keyboard` → `empty_ver1` → `event.human`. These exact `config/hotkeys/*.blk` paths can also be resolved individually. No runtime download, local path traversal, or new Rust dependency is involved.
+
+`import()` applies the chain base-first, for controls format version 5 and direct `basePresetPaths.default:t` references only. `import_explicit()` retains the previous export-only API. The original ordered document is unchanged in both modes. Missing presets, other reference groups, unsupported versions, and includes produce visible warnings rather than guessed bindings. Files without a declared base remain explicit-only.
+
+Merge behavior follows the pinned game's [`controlspreset.nut`](https://github.com/gszabi99/War-Thunder-Datamine/blob/aa326f10c6ba7d523647572368ead2e4d51ffb4d/gui.vromfs.bin_u/scripts/controls/controlspreset.nut#L574-L620): each hotkey action replaces all inherited alternatives; its same-layer blocks remain alternatives, including empty ones. Axis scalar properties overlay inherited properties without clearing omitted values. Cards identify their source preset or export; mixed-origin axes list retained properties and origins in their details.
+
+For the bundled export, **F5** (`ID_CAMERA_DEFAULT`), **F6** (`ID_CAMERA_GUNNER`), and **F7** (`ID_CAMERA_BOMBVIEW`) now come from the preset. Empty `ID_CAMERA_FPS` overrides do not resurrect inherited cockpit bindings.
+
+The result is a snapshot-based inspection, not a complete simulation of runtime controls: game versions, fallback migrations, implicit presets, default axis values, activation behavior, and device remapping can differ. See [snapshot provenance, rights caveat, and regeneration](src/bindings/presets/README.md). Python is needed only for regeneration, not building or running.
 
 ### Binding and conflict semantics
 
 - Each action block under `controls/hotkeys` or `controls/axes` is retained as a separate entry. Repeated input properties within one entry form one combination; repeated action blocks are alternatives.
-- Empty entries are shown as empty overrides/settings-only, not assumed to disable every inherited control. Their game-specific merge behavior is not simulated.
+- An explicit empty hotkey block replaces inherited alternatives for that action, but does not cancel nonempty siblings in the same layer. Empty axis blocks retain inherited scalar properties.
 - The original ordered document remains available alongside extracted entries, including settings, activation modes, device metadata, and unfamiliar input properties. Recognizable unfamiliar key/button/axis fields are labeled unknown, not interpreted as known devices.
 - Category is the explicit `Hotkeys`/`Axes` section. Nested structural groups provide a context label; no vehicle/game context is guessed from action names. The supplied flat export declares **no such contexts**.
-- Exact duplicate notes require the same action, section, context, full input combination, and ordered direct properties. Entries with nested blocks are excluded from exact-duplicate assertions because their direct properties alone do not establish identity.
+- Exact duplicate notes require the same action, section, context, full input combination, and ordered direct properties. Entries with nested blocks or retained inherited axis properties are excluded from exact-duplicate assertions because their direct properties alone do not establish identity.
 - Other identical full combinations are potential same-context overlaps or **context unknown** notes, never confirmed game conflicts. Different known structural contexts are not flagged against one another.
 - Disabled negative axis IDs and unknown input encodings do not participate in overlap comparisons. Joystick indices are displayed as exported; device offsets remain in metadata rather than being guessed into controller button names.
 
@@ -186,13 +200,13 @@ cargo test --locked --no-default-features
 cargo build --locked
 ```
 
-Tests cover parser syntax/diagnostics, malformed input, nesting limits, repeated entries, physical codes/layouts, combinations, conservative analysis, import resource limits, search/filter/sort behavior, failed-import state preservation, and both UI views at narrow/wide sizes. Integration tests use the **unaltered real export**: 92 hotkey entries, 5 axis entries, 80 keyboard properties, and 46 distinct keyboard codes. The screenshot duplicates and Space reuse are explicit regression cases.
+Tests cover parser syntax/diagnostics, malformed input, nesting limits, repeated entries, physical codes/layouts, combinations, conservative analysis, import resource limits, search/filter/sort behavior, failed-import state preservation, and both UI views at narrow/wide sizes. Export-only integration tests use the **unaltered real export**: 92 hotkey entries, 5 axis entries, 80 keyboard properties, and 46 distinct keyboard codes. Inheritance tests additionally cover F5–F7, recursive dependency closure, removed shortcuts, same-layer alternatives, partial/disabled axes, property provenance, unknown paths, versions, cycle/depth/visit limits, and unchanged source metadata. Screenshot duplicates remain explicit regression cases.
 
-Linux native startup has also been smoke-tested with Xvfb/Mesa and the real file, successfully loading all 97 entries. This does not substitute for manual testing on every desktop/driver. Windows build and native dialog behavior have not been verified locally; the CI workflow runs formatting, strict Clippy, tests, and builds on Linux and Windows when pushed.
+The earlier explicit-only Linux native startup was smoke-tested with Xvfb/Mesa and the real file, successfully loading its 97 entries; this is not validation of the inherited-preset UI. This does not substitute for manual testing on every desktop/driver. Windows build and native dialog behavior have not been verified locally; the CI workflow runs formatting, strict Clippy, tests, and builds on Linux and Windows when pushed.
 
 ## Known limitations
 
-- Base presets, includes, game defaults, live game localization assets, activation semantics, and the game's final merge/context rules are not resolved. There are no guaranteed “free key” or definitive conflict claims.
+- Only the five bundled preset paths and controls format version 5 are supported. Includes, implicit game defaults, fallback migrations, live localization assets, activation semantics, device remapping, and full runtime/context rules are not simulated. Nonstandard nested groups use structural matching, not game-context inference. There are no guaranteed “free key” or definitive conflict claims.
 - English action names use a versioned game-localization snapshot, not a live or exhaustive catalogue. Missing translations use identifier-based fallbacks; no other display language is implemented. Mouse/controller indices and axis properties are displayed rather than visualized or fully decoded.
 - Input is UTF-8 **text BLK**, not binary/compressed BLK or VROMF. Bracketed arrays/matrices, triple-quoted strings, and hexadecimal integer literals are not supported. Unknown property types and ordinary vector scalar text are preserved, but not semantically validated.
 - Resource safeguards: desktop imports are at most **16 MiB**, parser nesting is at most **128**, derived context/source paths share a **64 MiB allocation budget**, and overlap analysis checks at most **100,000 pairs**. Exceeding the pair limit leaves key usage complete but shows a prominent incomplete-analysis warning. Exceeding other limits rejects the import without replacing the current profile.
@@ -201,4 +215,4 @@ Linux native startup has also been smoke-tested with Xvfb/Mesa and the real file
 
 ## License
 
-Project code is MIT; see [LICENSE](LICENSE). The bundled export is a user-provided regression fixture. Bundled game localization strings originate from Gaijin Entertainment and are not relicensed under MIT; see [source attribution](src/bindings/localization/README.md). War Thunder and related marks belong to their respective owners.
+Viewer code is MIT; see [LICENSE](LICENSE). The bundled export is a user-provided regression fixture. Bundled game localization strings originate from Gaijin Entertainment and are not relicensed under MIT; see [source attribution](src/bindings/localization/README.md). Datamined preset data also remains third-party game data and is **not relicensed as MIT**; no affirmative redistribution permission was identified. Review [rights and provenance](src/bindings/presets/README.md#rights-and-license-provenance--unresolved) before publishing/distributing these assets. War Thunder and related marks belong to their respective owners.

@@ -1,0 +1,7 @@
+controls {
+  version:i=5
+  hotkeys {
+  }
+  axes {
+  }
+}

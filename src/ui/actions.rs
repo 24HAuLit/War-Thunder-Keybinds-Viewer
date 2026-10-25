@@ -40,7 +40,7 @@ impl EmptyFilter {
         match self {
             Self::All => "Include empty overrides",
             Self::Only => "Only empty / settings-only",
-            Self::Exclude => "Only explicit inputs",
+            Self::Exclude => "Only entries with inputs",
         }
     }
 }
@@ -95,7 +95,7 @@ impl ActionListState {
             .show(ui, |ui| {
                 ui.add(
                     egui::TextEdit::singleline(&mut self.query)
-                        .hint_text("Search action ID, English action name, combo, device, or context…")
+                        .hint_text("Search action ID, English action name, combo, device, context, or preset…")
                         .desired_width(ui.available_width()),
                 );
                 ui.horizontal_wrapped(|ui| {
@@ -157,7 +157,7 @@ impl ActionListState {
                     ui.selectable_value(&mut self.descending, false, "Ascending");
                     ui.selectable_value(&mut self.descending, true, "Descending");
                 });
-                ui.small("English action names use official game labels where known; unknown IDs use human-readable fallbacks. Each source entry is retained separately, including repeated action IDs and exact duplicates. Unknown context is never inferred from an ID.");
+                ui.small("English action names use official game labels where known; unknown IDs use human-readable fallbacks. Export entries override inherited hotkeys; surviving repeated entries and exact duplicates remain separate. Axis properties may have mixed origins. Unknown context is never inferred from an ID.");
                 let indices = self.filtered_indices(profile, analysis, layout);
                 ui.label(format!("{} of {} entries", indices.len(), profile.bindings.len()));
                 ui.separator();
@@ -248,7 +248,7 @@ impl ActionListState {
             return true;
         }
         format!(
-            "{}\n{}\n{}\n{}\n{}\n{}\n{}",
+            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
             binding.action,
             binding.display_name(),
             binding.combination(layout),
@@ -259,6 +259,7 @@ impl ActionListState {
                 .unwrap_or("Unknown (not declared)"),
             binding.section.name(),
             binding.source_path,
+            super::binding_origin(binding),
         )
         .to_lowercase()
         .contains(query)

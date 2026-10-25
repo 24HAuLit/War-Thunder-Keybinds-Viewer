@@ -1,6 +1,6 @@
 use wt_keybind_viewer::{
     bindings::{
-        analyzer::{analyze, import},
+        analyzer::{analyze, import_explicit as import},
         keymap::{Layout, is_known, key_label},
         model::{Input, IssueKind, Section},
     },

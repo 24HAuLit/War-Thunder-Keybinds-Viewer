@@ -60,6 +60,18 @@ pub struct Binding {
     /// Nested blocks remain in the document; do not assert leaf-entry identity.
     pub has_nested_data: bool,
     pub source_path: String,
+    /// Layer supplying this entry: None for the export, otherwise an exact
+    /// config/hotkeys/... allowlisted path. See inherited_properties for axes.
+    pub preset_source: Option<String>,
+    /// Effective scalar properties retained from earlier preset layers. These
+    /// are also present in properties; provenance is metadata, not extra inputs.
+    pub inherited_properties: Vec<InheritedProperty>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct InheritedProperty {
+    pub property: Property,
+    pub preset_source: String,
 }
 
 impl Binding {
@@ -120,6 +132,8 @@ pub struct Profile {
     pub document: Block,
     pub bindings: Vec<Binding>,
     pub preset_paths: Vec<String>,
+    /// Successfully applied embedded paths, unique and in base-first order.
+    pub resolved_presets: Vec<String>,
     pub includes: Vec<String>,
     pub warnings: Vec<String>,
 }

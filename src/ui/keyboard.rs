@@ -23,9 +23,9 @@ pub fn show(
         .auto_shrink([false, false])
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                legend(ui, USED, "1 explicit entry");
+                legend(ui, USED, "1 entry (export or preset)");
                 legend(ui, MULTIPLE, "Multiple entries (not necessarily a conflict)");
-                legend(ui, UNLISTED, "No explicit entry");
+                legend(ui, UNLISTED, "No displayed entry");
                 legend(ui, SELECTED, "Selected");
             });
             ui.small("Select a key to inspect every containing combination. Scroll horizontally on narrow windows; key sizes remain readable.");
@@ -44,7 +44,7 @@ pub fn show(
             let extra: Vec<_> = analysis.by_key.keys().filter(|code| !drawn.contains(*code)).copied().collect();
             if !extra.is_empty() {
                 ui.add_space(8.0);
-                ui.strong("Other keyboard codes in this export");
+                ui.strong("Other keyboard codes in this profile");
                 ui.small("Regional, media, nonvisual, and unknown codes are retained without remapping.");
                 ui.horizontal_wrapped(|ui| {
                     for code in extra {
@@ -70,9 +70,9 @@ pub fn show(
                     }
                 });
                 let indices = analysis.indices_for_key(code);
-                ui.label(format!("{} explicit entries contain this key", indices.len()));
+                ui.label(format!("{} entries contain this key (export + resolved presets)", indices.len()));
                 if indices.is_empty() {
-                    ui.label("No explicit entry in this export. This key may still be assigned by an unresolved preset or game default.");
+                    ui.label("No displayed entry. This key may still be assigned by an unresolved preset or game default.");
                 }
                 for &index in indices {
                     if binding_card(ui, profile, analysis, index, layout, true) {
@@ -223,7 +223,7 @@ fn keyboard(
         }
         if pointer_on_key {
             response.on_hover_text(format!(
-                "{label}\nPhysical DIK code {} ({:#x})\n{count} explicit entries\nCounts include full combinations, not just this key alone.\nNo explicit entry does not mean free in game.",
+                "{label}\nPhysical DIK code {} ({:#x})\n{count} entries (export + resolved presets)\nCounts include full combinations, not just this key alone.\nNo displayed entry does not mean free in game.",
                 key.code, key.code,
             ));
         }
