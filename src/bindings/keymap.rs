@@ -17,11 +17,22 @@ impl Layout {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyShape {
+    Rectangle,
+    /// The lower half is inset by 0.25 key pitch units on the left.
+    IsoEnter,
+}
+
+/// Physical key bounds in key pitch units, with the origin at the top left.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Key {
     pub code: i32,
-    /// Width in units of an ordinary letter key.
+    pub x: f32,
+    pub y: f32,
     pub width: f32,
+    pub height: f32,
+    pub shape: KeyShape,
 }
 
 // Gaijin's Dagor Engine DKEY scancodes match these DirectInput DIK offsets:
@@ -196,120 +207,186 @@ pub fn is_known(code: i32) -> bool {
     KEY_LABELS.iter().any(|&(known, _, _)| known == code)
 }
 
-/// A full-size 105-key ISO-style keyboard, independent of the chosen legends.
-/// The first six rows are the function/main block; navigation and arrows follow,
-/// then five numpad rows. Enter and numpad tall keys are flattened because `Key`
-/// has width but no height; no placeholder or duplicate scan codes are emitted.
-pub fn keyboard_rows() -> Vec<Vec<Key>> {
-    const ROWS: &[&[(i32, f32)]] = &[
-        &[
-            (1, 1.0),
-            (59, 1.0),
-            (60, 1.0),
-            (61, 1.0),
-            (62, 1.0),
-            (63, 1.0),
-            (64, 1.0),
-            (65, 1.0),
-            (66, 1.0),
-            (67, 1.0),
-            (68, 1.0),
-            (87, 1.0),
-            (88, 1.0),
-            (183, 1.0),
-            (70, 1.0),
-            (197, 1.0),
-        ],
-        &[
-            (41, 1.0),
-            (2, 1.0),
-            (3, 1.0),
-            (4, 1.0),
-            (5, 1.0),
-            (6, 1.0),
-            (7, 1.0),
-            (8, 1.0),
-            (9, 1.0),
-            (10, 1.0),
-            (11, 1.0),
-            (12, 1.0),
-            (13, 1.0),
-            (14, 2.0),
-        ],
-        &[
-            (15, 1.5),
-            (16, 1.0),
-            (17, 1.0),
-            (18, 1.0),
-            (19, 1.0),
-            (20, 1.0),
-            (21, 1.0),
-            (22, 1.0),
-            (23, 1.0),
-            (24, 1.0),
-            (25, 1.0),
-            (26, 1.0),
-            (27, 1.0),
-            (43, 1.5),
-        ],
-        &[
-            (58, 1.75),
-            (30, 1.0),
-            (31, 1.0),
-            (32, 1.0),
-            (33, 1.0),
-            (34, 1.0),
-            (35, 1.0),
-            (36, 1.0),
-            (37, 1.0),
-            (38, 1.0),
-            (39, 1.0),
-            (40, 1.0),
-            (28, 2.25),
-        ],
-        &[
-            (42, 1.25),
-            (86, 1.0),
-            (44, 1.0),
-            (45, 1.0),
-            (46, 1.0),
-            (47, 1.0),
-            (48, 1.0),
-            (49, 1.0),
-            (50, 1.0),
-            (51, 1.0),
-            (52, 1.0),
-            (53, 1.0),
-            (54, 2.75),
-        ],
-        &[
-            (29, 1.25),
-            (219, 1.25),
-            (56, 1.25),
-            (57, 6.25),
-            (184, 1.25),
-            (220, 1.25),
-            (221, 1.25),
-            (157, 1.25),
-        ],
-        &[(210, 1.0), (199, 1.0), (201, 1.0)],
-        &[(211, 1.0), (207, 1.0), (209, 1.0)],
-        &[(200, 1.0)],
-        &[(203, 1.0), (208, 1.0), (205, 1.0)],
-        &[(69, 1.0), (181, 1.0), (55, 1.0), (74, 1.0)],
-        &[(71, 1.0), (72, 1.0), (73, 1.0), (78, 1.0)],
-        &[(75, 1.0), (76, 1.0), (77, 1.0)],
-        &[(79, 1.0), (80, 1.0), (81, 1.0), (156, 1.0)],
-        &[(82, 2.0), (83, 1.0)],
-    ];
+/// A full-size 105-key ISO keyboard, independent of the chosen legends.
+/// Positions and bounds are in key pitch units; ISO Enter's bounds include its notch.
+pub fn keyboard_keys() -> Vec<Key> {
+    fn key(code: i32, x: f32, y: f32) -> Key {
+        Key {
+            code,
+            x,
+            y,
+            width: 1.0,
+            height: 1.0,
+            shape: KeyShape::Rectangle,
+        }
+    }
 
-    ROWS.iter()
-        .map(|row| {
-            row.iter()
-                .map(|&(code, width)| Key { code, width })
-                .collect()
-        })
-        .collect()
+    vec![
+        // Function row.
+        key(1, 0.0, 0.0),
+        key(59, 2.0, 0.0),
+        key(60, 3.0, 0.0),
+        key(61, 4.0, 0.0),
+        key(62, 5.0, 0.0),
+        key(63, 6.5, 0.0),
+        key(64, 7.5, 0.0),
+        key(65, 8.5, 0.0),
+        key(66, 9.5, 0.0),
+        key(67, 11.0, 0.0),
+        key(68, 12.0, 0.0),
+        key(87, 13.0, 0.0),
+        key(88, 14.0, 0.0),
+        // Main number row.
+        key(41, 0.0, 1.5),
+        key(2, 1.0, 1.5),
+        key(3, 2.0, 1.5),
+        key(4, 3.0, 1.5),
+        key(5, 4.0, 1.5),
+        key(6, 5.0, 1.5),
+        key(7, 6.0, 1.5),
+        key(8, 7.0, 1.5),
+        key(9, 8.0, 1.5),
+        key(10, 9.0, 1.5),
+        key(11, 10.0, 1.5),
+        key(12, 11.0, 1.5),
+        key(13, 12.0, 1.5),
+        Key {
+            width: 2.0,
+            ..key(14, 13.0, 1.5)
+        },
+        // Tab and the upper part of ISO Enter.
+        Key {
+            width: 1.5,
+            ..key(15, 0.0, 2.5)
+        },
+        key(16, 1.5, 2.5),
+        key(17, 2.5, 2.5),
+        key(18, 3.5, 2.5),
+        key(19, 4.5, 2.5),
+        key(20, 5.5, 2.5),
+        key(21, 6.5, 2.5),
+        key(22, 7.5, 2.5),
+        key(23, 8.5, 2.5),
+        key(24, 9.5, 2.5),
+        key(25, 10.5, 2.5),
+        key(26, 11.5, 2.5),
+        key(27, 12.5, 2.5),
+        Key {
+            width: 1.5,
+            height: 2.0,
+            shape: KeyShape::IsoEnter,
+            ..key(28, 13.5, 2.5)
+        },
+        // Caps row fits into ISO Enter's lower-left notch.
+        Key {
+            width: 1.75,
+            ..key(58, 0.0, 3.5)
+        },
+        key(30, 1.75, 3.5),
+        key(31, 2.75, 3.5),
+        key(32, 3.75, 3.5),
+        key(33, 4.75, 3.5),
+        key(34, 5.75, 3.5),
+        key(35, 6.75, 3.5),
+        key(36, 7.75, 3.5),
+        key(37, 8.75, 3.5),
+        key(38, 9.75, 3.5),
+        key(39, 10.75, 3.5),
+        key(40, 11.75, 3.5),
+        key(43, 12.75, 3.5),
+        Key {
+            width: 1.25,
+            ..key(42, 0.0, 4.5)
+        },
+        key(86, 1.25, 4.5),
+        key(44, 2.25, 4.5),
+        key(45, 3.25, 4.5),
+        key(46, 4.25, 4.5),
+        key(47, 5.25, 4.5),
+        key(48, 6.25, 4.5),
+        key(49, 7.25, 4.5),
+        key(50, 8.25, 4.5),
+        key(51, 9.25, 4.5),
+        key(52, 10.25, 4.5),
+        key(53, 11.25, 4.5),
+        Key {
+            width: 2.75,
+            ..key(54, 12.25, 4.5)
+        },
+        Key {
+            width: 1.25,
+            ..key(29, 0.0, 5.5)
+        },
+        Key {
+            width: 1.25,
+            ..key(219, 1.25, 5.5)
+        },
+        Key {
+            width: 1.25,
+            ..key(56, 2.5, 5.5)
+        },
+        Key {
+            width: 6.25,
+            ..key(57, 3.75, 5.5)
+        },
+        Key {
+            width: 1.25,
+            ..key(184, 10.0, 5.5)
+        },
+        Key {
+            width: 1.25,
+            ..key(220, 11.25, 5.5)
+        },
+        Key {
+            width: 1.25,
+            ..key(221, 12.5, 5.5)
+        },
+        Key {
+            width: 1.25,
+            ..key(157, 13.75, 5.5)
+        },
+        // Navigation and inverted-T arrows.
+        key(183, 15.5, 0.0),
+        key(70, 16.5, 0.0),
+        key(197, 17.5, 0.0),
+        key(210, 15.5, 1.5),
+        key(199, 16.5, 1.5),
+        key(201, 17.5, 1.5),
+        key(211, 15.5, 2.5),
+        key(207, 16.5, 2.5),
+        key(209, 17.5, 2.5),
+        key(200, 16.5, 4.5),
+        key(203, 15.5, 5.5),
+        key(208, 16.5, 5.5),
+        key(205, 17.5, 5.5),
+        // Numpad: tall keys are emitted only once.
+        key(69, 19.0, 1.5),
+        key(181, 20.0, 1.5),
+        key(55, 21.0, 1.5),
+        key(74, 22.0, 1.5),
+        key(71, 19.0, 2.5),
+        key(72, 20.0, 2.5),
+        key(73, 21.0, 2.5),
+        Key {
+            height: 2.0,
+            ..key(78, 22.0, 2.5)
+        },
+        key(75, 19.0, 3.5),
+        key(76, 20.0, 3.5),
+        key(77, 21.0, 3.5),
+        key(79, 19.0, 4.5),
+        key(80, 20.0, 4.5),
+        key(81, 21.0, 4.5),
+        Key {
+            height: 2.0,
+            ..key(156, 22.0, 4.5)
+        },
+        Key {
+            width: 2.0,
+            ..key(82, 19.0, 5.5)
+        },
+        key(83, 21.0, 5.5),
+    ]
 }
 
 #[cfg(test)]
@@ -472,48 +549,254 @@ mod tests {
         }
     }
 
+    fn find_key(keys: &[Key], code: i32) -> Key {
+        *keys
+            .iter()
+            .find(|key| key.code == code)
+            .expect("missing key")
+    }
+
+    // Split ISO Enter into its actual occupied areas, not its bounding box.
+    fn occupied_rectangles(key: Key) -> Vec<(f32, f32, f32, f32)> {
+        match key.shape {
+            KeyShape::Rectangle => vec![(key.x, key.y, key.width, key.height)],
+            KeyShape::IsoEnter => vec![
+                (key.x, key.y, key.width, 1.0),
+                (
+                    key.x + 0.25,
+                    key.y + 1.0,
+                    key.width - 0.25,
+                    key.height - 1.0,
+                ),
+            ],
+        }
+    }
+
     #[test]
-    fn visual_keyboard_has_105_unique_known_keys_and_sensible_widths() {
-        let rows = keyboard_rows();
-        assert_eq!(rows.len(), 15);
+    fn visual_keyboard_has_105_unique_known_keys_and_valid_bounds() {
+        let keys = keyboard_keys();
+        assert_eq!(keys.len(), 105);
         let mut codes = HashSet::new();
-        for row in &rows {
-            assert!(!row.is_empty());
-            for key in row {
-                assert!(is_known(key.code), "unmapped visual key {}", key.code);
-                assert!(codes.insert(key.code), "duplicate visual key {}", key.code);
-                assert!(key.width.is_finite() && key.width > 0.0);
+        for key in &keys {
+            assert!(is_known(key.code), "unmapped visual key {}", key.code);
+            assert!(codes.insert(key.code), "duplicate visual key {}", key.code);
+            assert!(key.x.is_finite() && key.x >= 0.0);
+            assert!(key.y.is_finite() && key.y >= 0.0);
+            assert!(key.width.is_finite() && key.width > 0.0);
+            assert!(key.height.is_finite() && key.height > 0.0);
+            assert!(key.x + key.width <= 23.0);
+            assert!(key.y + key.height <= 6.5);
+            assert_eq!(
+                key.height,
+                if matches!(key.code, 28 | 78 | 156) {
+                    2.0
+                } else {
+                    1.0
+                }
+            );
+            assert_eq!(
+                key.shape,
+                if key.code == 28 {
+                    KeyShape::IsoEnter
+                } else {
+                    KeyShape::Rectangle
+                }
+            );
+            if !matches!(
+                key.code,
+                14 | 15 | 28 | 29 | 42 | 54 | 56 | 57 | 58 | 82 | 157 | 184 | 219 | 220 | 221
+            ) {
+                assert_eq!(key.width, 1.0, "DIK {}", key.code);
             }
         }
         assert_eq!(codes.len(), 105);
-        for row in &rows[1..6] {
-            assert_eq!(row.iter().map(|key| key.width).sum::<f32>(), 15.0);
+    }
+
+    #[test]
+    fn function_row_has_explicit_group_gaps() {
+        let keys = keyboard_keys();
+        let expected = [
+            (1, 0.0),
+            (59, 2.0),
+            (60, 3.0),
+            (61, 4.0),
+            (62, 5.0),
+            (63, 6.5),
+            (64, 7.5),
+            (65, 8.5),
+            (66, 9.5),
+            (67, 11.0),
+            (68, 12.0),
+            (87, 13.0),
+            (88, 14.0),
+        ];
+        for (code, x) in expected {
+            let key = find_key(&keys, code);
+            assert_eq!((key.x, key.y, key.width, key.height), (x, 0.0, 1.0, 1.0));
         }
-        assert_eq!(rows[4][0].code, 42);
-        assert_eq!(rows[4][1].code, 86);
-        assert_eq!(rows[4][2].code, 44);
+    }
+
+    #[test]
+    fn main_rows_tile_exactly_from_zero_to_fifteen() {
+        let keys = keyboard_keys();
+        for y in [1.5, 2.5, 3.5, 4.5, 5.5] {
+            let mut row: Vec<_> = keys
+                .iter()
+                .copied()
+                .filter(|key| key.x < 15.0)
+                .flat_map(occupied_rectangles)
+                .filter(|rect| rect.1 == y)
+                .collect();
+            row.sort_by(|a, b| a.0.total_cmp(&b.0));
+            assert!(!row.is_empty());
+            let mut right = 0.0;
+            for (x, _, width, height) in row {
+                assert_eq!(x, right, "gap or overlap at y={y}, x={x}");
+                assert_eq!(height, 1.0);
+                right = x + width;
+            }
+            assert_eq!(right, 15.0, "main row at y={y}");
+        }
+    }
+
+    #[test]
+    fn iso_enter_and_staggered_main_rows_are_positioned_correctly() {
+        let keys = keyboard_keys();
         assert_eq!(
-            rows[5][3],
+            find_key(&keys, 28),
             Key {
-                code: 57,
-                width: 6.25
+                code: 28,
+                x: 13.5,
+                y: 2.5,
+                width: 1.5,
+                height: 2.0,
+                shape: KeyShape::IsoEnter,
             }
         );
+        assert_eq!(
+            occupied_rectangles(find_key(&keys, 28)),
+            vec![(13.5, 2.5, 1.5, 1.0), (13.75, 3.5, 1.25, 1.0),]
+        );
+        for (code, x, y, width) in [
+            (41, 0.0, 1.5, 1.0),
+            (14, 13.0, 1.5, 2.0),
+            (15, 0.0, 2.5, 1.5),
+            (58, 0.0, 3.5, 1.75),
+            (43, 12.75, 3.5, 1.0),
+            (42, 0.0, 4.5, 1.25),
+            (86, 1.25, 4.5, 1.0),
+            (54, 12.25, 4.5, 2.75),
+            (29, 0.0, 5.5, 1.25),
+            (219, 1.25, 5.5, 1.25),
+            (56, 2.5, 5.5, 1.25),
+            (57, 3.75, 5.5, 6.25),
+            (184, 10.0, 5.5, 1.25),
+            (220, 11.25, 5.5, 1.25),
+            (221, 12.5, 5.5, 1.25),
+            (157, 13.75, 5.5, 1.25),
+        ] {
+            let key = find_key(&keys, code);
+            assert_eq!(
+                (key.x, key.y, key.width, key.height),
+                (x, y, width, 1.0),
+                "DIK {code}"
+            );
+        }
+        for (codes, x, y) in [
+            (2..=13, 1.0, 1.5),
+            (16..=27, 1.5, 2.5),
+            (30..=40, 1.75, 3.5),
+            (44..=53, 2.25, 4.5),
+        ] {
+            for (offset, code) in codes.enumerate() {
+                let key = find_key(&keys, code);
+                assert_eq!(
+                    (key.x, key.y, key.width),
+                    (x + offset as f32, y, 1.0),
+                    "DIK {code}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn navigation_and_arrows_align_with_main_rows() {
+        let keys = keyboard_keys();
+        for (codes, y) in [
+            ([183, 70, 197], 0.0),
+            ([210, 199, 201], 1.5),
+            ([211, 207, 209], 2.5),
+            ([203, 208, 205], 5.5),
+        ] {
+            for (column, code) in codes.into_iter().enumerate() {
+                let key = find_key(&keys, code);
+                assert_eq!((key.x, key.y), (15.5 + column as f32, y), "DIK {code}");
+            }
+        }
+        let up = find_key(&keys, 200);
+        let down = find_key(&keys, 208);
+        assert_eq!((up.x, up.y), (16.5, 4.5));
+        assert_eq!((up.x, up.y + up.height), (down.x, down.y));
+    }
+
+    #[test]
+    fn numpad_has_aligned_columns_tall_keys_and_wide_zero() {
+        let keys = keyboard_keys();
+        for (codes, y) in [
+            (&[69, 181, 55, 74][..], 1.5),
+            (&[71, 72, 73, 78][..], 2.5),
+            (&[75, 76, 77][..], 3.5),
+            (&[79, 80, 81, 156][..], 4.5),
+        ] {
+            for (column, &code) in codes.iter().enumerate() {
+                let key = find_key(&keys, code);
+                assert_eq!(
+                    (key.x, key.y, key.width),
+                    (19.0 + column as f32, y, 1.0),
+                    "DIK {code}"
+                );
+            }
+        }
+        let plus = find_key(&keys, 78);
+        let enter = find_key(&keys, 156);
+        assert_eq!((plus.height, enter.height), (2.0, 2.0));
+        assert_eq!((plus.x, plus.y + plus.height), (enter.x, enter.y));
+        assert_eq!(enter.y + enter.height, 6.5);
+        let zero = find_key(&keys, 82);
+        let decimal = find_key(&keys, 83);
+        assert_eq!(
+            (zero.x, zero.y, zero.width, zero.height),
+            (19.0, 5.5, 2.0, 1.0)
+        );
+        assert_eq!((decimal.x, decimal.y), (21.0, 5.5));
+        assert_eq!(zero.x + zero.width, decimal.x);
+        assert_eq!(decimal.x + decimal.width, enter.x);
+    }
+
+    #[test]
+    fn physical_key_shapes_do_not_overlap() {
+        let keys = keyboard_keys();
+        for (index, &a) in keys.iter().enumerate() {
+            for &b in &keys[index + 1..] {
+                for (ax, ay, aw, ah) in occupied_rectangles(a) {
+                    for (bx, by, bw, bh) in occupied_rectangles(b) {
+                        let overlaps = ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah;
+                        assert!(!overlaps, "DIK {} overlaps DIK {}", a.code, b.code);
+                    }
+                }
+            }
+        }
     }
 
     #[test]
     fn selecting_legends_preserves_physical_codes_and_geometry() {
-        let before = keyboard_rows();
-        for row in &before {
-            for key in row {
-                let _ = key_label(key.code, Layout::Qwerty);
-                let _ = key_label(key.code, Layout::Azerty);
-            }
+        let before = keyboard_keys();
+        for key in &before {
+            let _ = key_label(key.code, Layout::Qwerty);
+            let _ = key_label(key.code, Layout::Azerty);
         }
-        assert_eq!(keyboard_rows(), before);
-        assert_eq!(before[2][1].code, 16);
-        assert_eq!(key_label(before[2][1].code, Layout::Azerty), "A");
-        assert_eq!(before[3][1].code, 30);
-        assert_eq!(key_label(before[3][1].code, Layout::Azerty), "Q");
+        assert_eq!(keyboard_keys(), before);
+        assert_eq!(key_label(find_key(&before, 16).code, Layout::Azerty), "A");
+        assert_eq!(key_label(find_key(&before, 30).code, Layout::Azerty), "Q");
     }
 }
