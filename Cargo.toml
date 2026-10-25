@@ -1,0 +1,22 @@
+[package]
+name = "wt-keybind-viewer"
+version = "0.1.0"
+edition = "2024"
+description = "Read-only explorer for War Thunder exported controls"
+license = "MIT"
+
+[features]
+default = ["desktop"]
+desktop = ["dep:eframe", "dep:rfd", "dep:tracing", "dep:tracing-subscriber"]
+
+[dependencies]
+thiserror = "2"
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"], optional = true }
+rfd = { version = "0.15", optional = true }
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter"], optional = true }
+
+[[bin]]
+name = "wt-keybind-viewer"
+path = "src/main.rs"
+required-features = ["desktop"]
